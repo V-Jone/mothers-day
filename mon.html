@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>母亲节快乐</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(135deg, #FFF0F5 0%, #FFE4E1 50%, #FFF0F5 100%);
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+        }
+        #canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .controls {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+            z-index: 10;
+            background: rgba(255,255,255,0.7);
+            padding: 5px 15px;
+            border-radius: 15px;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="controls">点击屏幕种花 | 自动绽放花海</div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 判断是否为手机
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // 工具函数
+        function random(min, max) { return Math.random() * (max - min) + min; }
+        function randomInt(min, max) { return Math.floor(random(min, max)); }
+        function randomChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+        
+        // 根据屏幕尺寸计算字体大小
+        function getFontSize(baseSize) {
+            const minDim = Math.min(canvas.width, canvas.height);
+            if (isMobile) {
+                return Math.floor(baseSize * minDim / 800);
+            }
+            return baseSize;
+        }
+        
+        // 花朵类
+        class Flower {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = 1;
+                this.maxSize = randomInt(isMobile ? 15 : 25, isMobile ? 45 : 70);
+                this.growth = random(0.3, 1.2);
+                this.petals = randomChoice([5, 6, 8, 10]);
+                this.color = randomChoice([
+                    '#FF69B4', '#FF1493', '#FFB6C1', '#FF6347',
+                    '#FFA07A', '#FF8C00', '#FF4500', '#DC143C',
+                    '#FF007F', '#FF66CC', '#FF99CC', '#FFCCDD',
+                    '#F08080', '#FA8072', '#E9967A', '#FF6B9D'
+                ]);
+                this.center = '#FFD700';
+                this.age = 0;
+                this.rotation = random(0, Math.PI * 2);
+            }
+            
+            draw(ctx) {
+                if (this.size < 2) return;
+                
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                for (let i = 0; i < this.petals; i++) {
+                    const angle = (Math.PI * 2 / this.petals) * i - Math.PI / 2;
+                    this.drawPetal(ctx, angle);
+                }
+                
+                const r = this.size * 0.18;
+                ctx.beginPath();
+                ctx.arc(0, 0, r, 0, Math.PI * 2);
+                ctx.fillStyle = this.center;
+                ctx.fill();
+                ctx.strokeStyle = '#FF8C00';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+            
+            drawPetal(ctx, angle) {
+                const cosA = Math.cos(angle);
+                const sinA = Math.sin(angle);
+                const s = this.size;
+                
+                const pts = [
+                    {x: 0, y: 0},
+                    {x: -s*0.28, y: -s*0.25},
+                    {x: 0, y: -s},
+                    {x: s*0.28, y: -s*0.25}
+                ];
+                
+                ctx.beginPath();
+                pts.forEach((p, i) => {
+                    const rx = p.x * cosA - p.y * sinA;
+                    const ry = p.x * sinA + p.y * cosA;
+                    if (i === 0) ctx.moveTo(rx, ry);
+                    else ctx.lineTo(rx, ry);
+                });
+                ctx.closePath();
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+            
+            update() {
+                if (this.size < this.maxSize) {
+                    this.size += this.growth;
+                }
+                this.age++;
+                if (this.age > 600) return false;
+                return true;
+            }
+        }
+        
+        // 祝福语类
+        class Blessing {
+            constructor(text, x, y) {
+                this.text = text;
+                this.x = x;
+                this.y = y;
+                this.baseX = x;
+                this.speed = random(0.5, 1.2);
+                this.phase = random(0, Math.PI * 2);
+                this.color = randomChoice([
+                    '#C71585', '#DB7093', '#FF1493', '#B22222',
+                    '#8B008B', '#FF69B4', '#DC143C', '#FF4500',
+                    '#FF007F', '#C71585', '#FF6347', '#DDA0DD'
+                ]);
+                this.fontSize = randomInt(isMobile ? 18 : 28, isMobile ? 32 : 48);
+                this.age = 0;
+                this.lifespan = randomInt(350, 600);
+                this.opacity = 0;
+            }
+            
+            draw(ctx) {
+                if (this.age < 30) {
+                    this.opacity = this.age / 30;
+                } else if (this.age > this.lifespan - 80) {
+                    this.opacity = (this.lifespan - this.age) / 80;
+                } else {
+                    this.opacity = 1;
+                }
+                
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.opacity);
+                ctx.font = `bold ${this.fontSize}px 'Microsoft YaHei', sans-serif`;
+                ctx.fillStyle = this.color;
+                ctx.textAlign = 'center';
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.restore();
+            }
+            
+            update() {
+                this.age++;
+                this.y -= this.speed;
+                this.phase += 0.025;
+                this.x = this.baseX + Math.sin(this.phase) * 20;
+                
+                if (this.y < -50 || this.age > this.lifespan) return false;
+                return true;
+            }
+        }
+        
+        // 星星类
+        class Star {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = random(1, isMobile ? 2 : 3);
+                this.phase = random(0, Math.PI * 2);
+            }
+            
+            draw(ctx) {
+                this.phase += 0.05;
+                const brightness = Math.floor(128 + 127 * Math.sin(this.phase));
+                const alpha = (Math.sin(this.phase) + 1) / 2 * 0.8;
+                
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${Math.floor(brightness*0.8)})`;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+        
+        // 粒子类
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = random(-3, 3);
+                this.vy = random(-3, 3);
+                this.life = randomInt(30, 60);
+                this.maxLife = this.life;
+                this.color = color;
+                this.size = random(2, 4);
+            }
+            
+            draw(ctx) {
+                const alpha = this.life / this.maxLife;
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * alpha, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+            
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.1;
+                this.life--;
+                return this.life > 0;
+            }
+        }
+        
+        const blessings = [
+            "妈妈，母亲节快乐！", "感谢您无私的爱", "您是我永远的港湾",
+            "愿岁月温柔待您", "妈妈，我爱您！", "您的付出，我都懂",
+            "祝您健康长寿", "世界上最美的妈妈", "感恩有您，伴我成长",
+            "妈妈，您辛苦了", "愿您笑口常开", "您的爱，温暖我一生",
+            "您是我心中的太阳", "愿幸福永远围绕您", "妈妈，谢谢您",
+            "愿您永远年轻美丽", "您是我最好的妈妈", "爱您，不止今天",
+            "有您的地方就是家", "妈妈，我永远的依靠", "母亲节快乐！",
+            "感谢您的养育之恩", "您是我最大的骄傲", "愿您天天好心情"
+        ];
+        
+        let flowers = [];
+        let texts = [];
+        let stars = [];
+        let particles = [];
+        
+        for (let i = 0; i < (isMobile ? 60 : 100); i++) {
+            stars.push(new Star(random(0, canvas.width), random(0, canvas.height)));
+        }
+        
+        function drawTitle(ctx) {
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 10;
+            
+            const titleSize = getFontSize(isMobile ? 36 : 72);
+            const subTitleSize = getFontSize(isMobile ? 16 : 32);
+            
+            // 阴影
+            ctx.font = `bold ${titleSize}px 'Microsoft YaHei', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#FFB6C1';
+            ctx.fillText('🌸 母亲节快乐 🌸', cx + 2, cy + 2);
+            
+            // 主标题
+            ctx.fillStyle = '#C71585';
+            ctx.fillText('🌸 母亲节快乐 🌸', cx, cy);
+            
+            // 副标题
+            ctx.font = `bold ${subTitleSize}px 'Microsoft YaHei', sans-serif`;
+            ctx.fillStyle = '#DB7093';
+            const subY = cy + titleSize * 0.8;
+            ctx.fillText('愿天下所有的妈妈幸福安康，笑口常开', cx, subY);
+            
+            // 装饰线
+            ctx.strokeStyle = '#FF69B4';
+            ctx.lineWidth = isMobile ? 2 : 3;
+            ctx.beginPath();
+            const lineY = subY + subTitleSize * 0.6;
+            ctx.moveTo(cx - (isMobile ? 100 : 200), lineY);
+            ctx.lineTo(cx + (isMobile ? 100 : 200), lineY);
+            ctx.stroke();
+        }
+        
+        function spawnFlower() {
+            if (flowers.length < (isMobile ? 35 : 50)) {
+                const x = randomInt(20, canvas.width - 20);
+                const y = randomInt(canvas.height / 5, canvas.height - 30);
+                flowers.push(new Flower(x, y));
+            }
+            setTimeout(spawnFlower, randomInt(300, 1000));
+        }
+        
+        function spawnBlessing() {
+            if (texts.length < (isMobile ? 12 : 20)) {
+                const text = randomChoice(blessings);
+                const x = randomInt(50, canvas.width - 50);
+                const y = canvas.height + 30;
+                texts.push(new Blessing(text, x, y));
+            }
+            setTimeout(spawnBlessing, randomInt(1000, 2000));
+        }
+        
+        function addBurst(x, y) {
+            const count = randomInt(isMobile ? 5 : 8, isMobile ? 10 : 15);
+            for (let i = 0; i < count; i++) {
+                const fx = x + random(-80, 80);
+                const fy = y + random(-80, 80);
+                flowers.push(new Flower(fx, fy));
+                
+                for (let j = 0; j < (isMobile ? 3 : 5); j++) {
+                    particles.push(new Particle(fx, fy, randomChoice(['#FFD700', '#FF69B4', '#FFA500'])));
+                }
+            }
+        }
+        
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            addBurst(x, y);
+        });
+        
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            addBurst(x, y);
+        });
+        
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            stars.forEach(star => star.draw(ctx));
+            drawTitle(ctx);
+            
+            flowers = flowers.filter(flower => {
+                const alive = flower.update();
+                if (alive) flower.draw(ctx);
+                return alive;
+            });
+            
+            texts = texts.filter(text => {
+                const alive = text.update();
+                if (alive) text.draw(ctx);
+                return alive;
+            });
+            
+            particles = particles.filter(p => {
+                const alive = p.update();
+                if (alive) p.draw(ctx);
+                return alive;
+            });
+            
+            requestAnimationFrame(animate);
+        }
+        
+        spawnFlower();
+        spawnBlessing();
+        animate();
+        
+        setInterval(() => {
+            if (Math.random() < 0.7) {
+                addBurst(canvas.width / 2, canvas.height / 2);
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
